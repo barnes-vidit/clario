@@ -3,6 +3,7 @@ import Onboarding from './components/Onboarding'
 import AnnotationReview from './components/AnnotationReview'
 import SessionView from './components/SessionView'
 import SessionReport from './components/SessionReport'
+import FullScriptView from './components/FullScriptView'
 
 // Layout wrapper for consistent bg + page transitions
 function PageWrapper({ children }) {
@@ -32,6 +33,10 @@ export default function App() {
         <Route
           path="/report/:sessionId"
           element={<PageWrapper><SessionReport /></PageWrapper>}
+        />
+        <Route
+          path="/session/:sessionId/fullscript"
+          element={<PageWrapper><FullScriptView /></PageWrapper>}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

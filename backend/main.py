@@ -56,7 +56,7 @@ groq_limiter = RateLimiter(calls_per_minute=25)
 app.state.groq_limiter = groq_limiter
 
 # --- Register routers ---
-from routers import upload, session, analyse, feedback, tts, live_coach  # noqa: E402
+from routers import upload, session, analyse, feedback, tts, live_coach, fullscript  # noqa: E402
 
 app.include_router(upload.router, prefix="/api")
 app.include_router(session.router, prefix="/api")
@@ -64,6 +64,7 @@ app.include_router(analyse.router, prefix="/api")
 app.include_router(feedback.router, prefix="/api")
 app.include_router(tts.router, prefix="/api")
 app.include_router(live_coach.router)
+app.include_router(fullscript.router, prefix="/api")
 
 
 @app.on_event("startup")
