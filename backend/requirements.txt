@@ -15,3 +15,5 @@ edge-tts
 httpx
 websockets
 imageio-ffmpeg
+sentry-sdk[fastapi]
+tenacity

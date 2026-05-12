@@ -5,8 +5,8 @@ import numpy as np
 from fastapi import APIRouter, HTTPException
 from groq import AsyncGroq
 from pydantic import BaseModel
-
 import session_store
+from utils import call_groq_with_retry
 
 log = logging.getLogger("clario.feedback")
 router = APIRouter()
@@ -19,6 +19,7 @@ def _get_groq_client() -> AsyncGroq:
     if _groq_client is None:
         _groq_client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
     return _groq_client
+
 
 THRESHOLDS = {
     "beginner":     {"pacing": 60, "filler_words": 60, "pauses": 50, "hero_word_emphasis": None},
@@ -169,7 +170,8 @@ If STATUS IS PASSED: react like a friend who just heard them nail it — pick on
 If STATUS IS NOT PASSED: give one direct tip on the weakest area using the specific word or pause above — like you're telling a friend what to fix, not writing a report.
 2–3 short sentences. Casual. No formal language."""
 
-    response = await _get_groq_client().chat.completions.create(
+    response = await call_groq_with_retry(
+        _get_groq_client(),
         model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
         messages=[
             {
@@ -222,21 +224,26 @@ async def get_feedback(body: FeedbackRequest):
     )
 
     auto_advanced = not passed and body.retry_num >= 3
-    if auto_advanced:
-        needs_review = data.get("needs_review", [])
-        if body.sentence_id not in needs_review:
-            needs_review.append(body.sentence_id)
-        session_store.update(body.session_id, needs_review=needs_review)
 
-    # Update scores in session store
-    session_scores = data.get("scores", {})
-    sentence_key = str(body.sentence_id)
-    if sentence_key not in session_scores:
-        session_scores[sentence_key] = {"attempts": []}
-    session_scores[sentence_key]["attempts"].append(scores)
-    session_scores[sentence_key]["latest"] = scores
-    session_scores[sentence_key]["passed"] = passed or auto_advanced
-    session_store.update(body.session_id, scores=session_scores)
+    async with session_store.get_lock(body.session_id):
+        current = session_store.get(body.session_id)
+        if current is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        if auto_advanced:
+            needs_review = current.get("needs_review", [])
+            if body.sentence_id not in needs_review:
+                needs_review.append(body.sentence_id)
+            session_store.update(body.session_id, needs_review=needs_review)
+
+        session_scores = current.get("scores", {})
+        sentence_key = str(body.sentence_id)
+        if sentence_key not in session_scores:
+            session_scores[sentence_key] = {"attempts": []}
+        session_scores[sentence_key]["attempts"].append(scores)
+        session_scores[sentence_key]["latest"] = scores
+        session_scores[sentence_key]["passed"] = passed or auto_advanced
+        session_store.update(body.session_id, scores=session_scores)
 
     try:
         coaching_text = await _get_coaching_text(

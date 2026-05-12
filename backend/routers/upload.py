@@ -7,8 +7,8 @@ from io import BytesIO
 
 from groq import AsyncGroq
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Request
-
 import session_store
+from utils import call_groq_with_retry
 
 log = logging.getLogger("clario.upload")
 router = APIRouter()
@@ -21,6 +21,7 @@ def _get_groq_client() -> AsyncGroq:
     if _groq_client is None:
         _groq_client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
     return _groq_client
+
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 
@@ -184,7 +185,8 @@ async def _annotate_script(script_text: str, skill_level: str, limiter) -> list[
     await limiter.wait()
     prompt = ANNOTATION_PROMPT.format(script_text=script_text, skill_level=skill_level)
 
-    response = await _get_groq_client().chat.completions.create(
+    response = await call_groq_with_retry(
+        _get_groq_client(),
         model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},

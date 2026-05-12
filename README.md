@@ -114,3 +114,23 @@ clario/
 ```
 
 > **Note:** Sessions are in-memory only — no database. All session data is lost when the backend restarts.
+
+## Deployment
+
+### Backend — Railway or Render
+
+1. Push this repo to GitHub.
+2. Create a new **Web Service** pointing to the repo; set the root directory to `backend`.
+3. Set **build command**: `pip install -r requirements.txt`
+4. Set **start command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+5. Add every variable from `backend/.env.example` as a secret env var.
+6. Set `ALLOWED_ORIGINS` to your deployed frontend URL, e.g. `https://clario.vercel.app`.
+
+### Frontend — Vercel or Netlify
+
+1. Import the repo and set **root directory** to `frontend`.
+2. **Build command**: `npm run build`
+3. **Output directory**: `dist`
+4. Add env vars:
+   - `VITE_BACKEND_URL=https://<your-backend-url>`
+   - `VITE_BACKEND_WS_URL=wss://<your-backend-url>` (use `wss://` for production)
