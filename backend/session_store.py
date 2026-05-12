@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 # In-memory store keyed by session UUID.
@@ -11,6 +12,13 @@ from typing import Any
 #   "current_sentence_id": int,
 # }
 _store: dict[str, dict[str, Any]] = {}
+_locks: dict[str, asyncio.Lock] = {}
+
+
+def get_lock(session_id: str) -> asyncio.Lock:
+    if session_id not in _locks:
+        _locks[session_id] = asyncio.Lock()
+    return _locks[session_id]
 
 
 def get(session_id: str) -> dict | None:

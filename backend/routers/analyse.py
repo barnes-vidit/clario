@@ -8,6 +8,7 @@ import assemblyai as aai
 import librosa
 import numpy as np
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 import session_store
 from utils import find_ffmpeg
@@ -20,6 +21,7 @@ FILLER_WORDS = {"um", "uh", "er", "hmm", "like", "basically", "you know"}
 FMIN = 75
 FMAX = 400
 PAUSE_THRESHOLD_MS = 350
+MAX_AUDIO_BYTES = 10 * 1024 * 1024
 
 
 _FFMPEG = find_ffmpeg()
@@ -29,7 +31,7 @@ else:
     log.info(f"ffmpeg: {_FFMPEG}")
 
 
-def _convert_to_wav(audio_bytes: bytes, source_suffix: str) -> str:
+def _convert_to_wav(audio_bytes: bytes, source_suffix: str) -> tuple[str, str]:
     if _FFMPEG is None:
         raise RuntimeError(
             "ffmpeg is not installed or not on PATH. "
@@ -46,10 +48,9 @@ def _convert_to_wav(audio_bytes: bytes, source_suffix: str) -> str:
         capture_output=True,
         text=True,
     )
-    os.unlink(tmp_in)
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg conversion failed: {result.stderr[-500:]}")
-    return tmp_wav
+    return tmp_in, tmp_wav
 
 
 def _detect_suffix(content_type: str) -> str:
@@ -58,6 +59,11 @@ def _detect_suffix(content_type: str) -> str:
     if "mp4" in content_type or "m4a" in content_type:
         return ".mp4"
     return ".webm"
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10), reraise=True)
+def _transcribe(transcriber: aai.Transcriber, wav_path: str, config: aai.TranscriptionConfig) -> object:
+    return transcriber.transcribe(wav_path, config)
 
 
 async def _run_stt(wav_path: str, hero_word_texts: list[str]) -> object:
@@ -74,11 +80,10 @@ async def _run_stt(wav_path: str, hero_word_texts: list[str]) -> object:
         config_kwargs["boost_param"] = aai.WordBoost.high
     config = aai.TranscriptionConfig(**config_kwargs)
     transcriber = aai.Transcriber()
-    return await asyncio.to_thread(transcriber.transcribe, wav_path, config)
+    return await asyncio.to_thread(_transcribe, transcriber, wav_path, config)
 
 
-def _acoustic_analysis(wav_path: str, words: list[dict]) -> dict:
-    y, sr = librosa.load(wav_path, sr=16000)
+def _acoustic_analysis(y: np.ndarray, sr: int, words: list[dict]) -> dict:
     duration_s = librosa.get_duration(y=y, sr=sr)
 
     f0, _, _ = librosa.pyin(y, fmin=FMIN, fmax=FMAX, sr=sr)
@@ -136,19 +141,31 @@ async def analyse_audio(
         raise HTTPException(status_code=404, detail="Session not found")
 
     audio_bytes = await audio.read()
+    if len(audio_bytes) > MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=400, detail="Audio file too large (max 10 MB).")
+
     content_type = audio.content_type or "audio/webm"
     suffix = _detect_suffix(content_type)
+    sentences_map = data.get("sentences_map", {})
 
+    tmp_in = None
+    tmp_wav = None
     try:
-        wav_path = _convert_to_wav(audio_bytes, suffix)
-    except Exception as e:
-        log.exception("Audio conversion failed")
-        raise HTTPException(status_code=422, detail=f"Audio conversion failed: {e}")
+        try:
+            tmp_in, tmp_wav = _convert_to_wav(audio_bytes, suffix)
+        except Exception as e:
+            log.exception("Audio conversion failed")
+            raise HTTPException(status_code=422, detail=f"Audio conversion failed: {e}")
 
-    try:
+        y, sr = librosa.load(tmp_wav, sr=16000)
+        duration = librosa.get_duration(y=y, sr=sr)
+        if duration < 0.5:
+            raise HTTPException(status_code=400, detail="Recording too short (minimum 0.5 seconds).")
+        if duration > 90:
+            raise HTTPException(status_code=400, detail="Recording too long (maximum 90 seconds).")
+
         hero_word_texts: list[str] = []
         if type == "sentence" and sentence_id is not None:
-            sentences_map = data.get("sentences_map", {})
             ann = sentences_map.get(sentence_id) or sentences_map.get(str(sentence_id))
             if ann:
                 words_list = ann["text"].split()
@@ -156,7 +173,7 @@ async def analyse_audio(
                     words_list[i] for i in ann.get("hero_words", []) if i < len(words_list)
                 ]
 
-        transcript = await _run_stt(wav_path, hero_word_texts)
+        transcript = await _run_stt(tmp_wav, hero_word_texts)
 
         if transcript.status == aai.TranscriptStatus.error:
             raise HTTPException(status_code=502, detail=f"STT error: {transcript.error}")
@@ -168,7 +185,6 @@ async def analyse_audio(
 
         # Words that appear in the actual script must never be treated as fillers —
         # e.g. "like" in "I would like to speak" is a content word, not a filler.
-        sentences_map = data.get("sentences_map", {})
         ann_for_filter = sentences_map.get(sentence_id) or sentences_map.get(str(sentence_id)) if sentence_id is not None else None
         script_words_lower: set[str] = (
             {w.lower().strip(".,!?") for w in (ann_for_filter["text"].split() if ann_for_filter else [])}
@@ -186,14 +202,10 @@ async def analyse_audio(
             cleaned = word_text.lower().strip(".,!?")
             return len(cleaned) <= 1 and cleaned not in script_words_lower
 
-        # Only count recognised filler vocabulary as filler — not STT artifacts
         filler_words_found = [w["text"] for w in all_words if _is_filler(w["text"])]
-
-        # Strip both fillers and artifacts so word_pitch/word_intensity/pauses indices
-        # align with annotation's hero_words and pause_markers (indexed against ann["text"].split()).
         content_words = [w for w in all_words if not _is_filler(w["text"]) and not _is_artifact(w["text"])]
 
-        acoustic = _acoustic_analysis(wav_path, content_words)
+        acoustic = _acoustic_analysis(y, sr, content_words)
 
         return {
             "transcript": transcript.text,
@@ -208,7 +220,9 @@ async def analyse_audio(
         log.exception("Analysis failed")
         raise HTTPException(status_code=502, detail=f"Analysis failed: {e}")
     finally:
-        try:
-            os.unlink(wav_path)
-        except OSError:
-            pass
+        for p in (tmp_in, tmp_wav):
+            if p:
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass

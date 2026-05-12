@@ -3,20 +3,34 @@ import logging
 import os
 import time
 
+import httpx
+import sentry_sdk
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 load_dotenv()
+
+_SENTRY_DSN = os.getenv("SENTRY_DSN")
+if _SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=_SENTRY_DSN,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=0.1,
+    )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
 log = logging.getLogger("clario")
 
 app = FastAPI(title="Clario", version="1.0.0")
 
+origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,6 +85,29 @@ async def shutdown():
     log.info("Clario backend shut down — all Gemini Live connections closed")
 
 
+async def _probe(url: str) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            r = await client.get(url)
+            return r.status_code < 500
+    except Exception:
+        return False
+
+
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    groq_ok, assemblyai_ok, gemini_ok = await asyncio.gather(
+        _probe("https://api.groq.com"),
+        _probe("https://api.assemblyai.com"),
+        _probe("https://generativelanguage.googleapis.com"),
+    )
+
+    return {
+        "status": "ok",
+        "version": app.version,
+        "dependencies": {
+            "groq": groq_ok,
+            "assemblyai": assemblyai_ok,
+            "gemini": gemini_ok,
+        },
+    }
