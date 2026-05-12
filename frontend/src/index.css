@@ -1,0 +1,275 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base reset ────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-stage-900 text-stage-50 min-h-screen;
+    background-image:
+      radial-gradient(ellipse 55% 35% at 12% 0%, rgba(99,102,241,0.07) 0%, transparent 65%),
+      radial-gradient(ellipse 45% 30% at 88% 105%, rgba(240,165,0,0.06) 0%, transparent 65%);
+  }
+
+  ::selection {
+    background: rgba(240, 165, 0, 0.28);
+    color: #fff;
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #24304E; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2D3C5C; }
+}
+
+/* ─── Component utilities ───────────────────────────────────────── */
+@layer components {
+
+  /* ── Cards ───────────────────────────── */
+  .card {
+    background: rgba(14, 20, 34, 0.92);
+    border: 1px solid rgba(28, 38, 64, 0.8);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.35);
+    backdrop-filter: blur(8px);
+  }
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+  .card-hover:hover {
+    background: rgba(19, 27, 46, 0.95);
+    border-color: rgba(36, 48, 78, 0.9);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.6), 0 16px 48px rgba(0,0,0,0.45);
+  }
+
+  /* ── Buttons ─────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3
+           bg-amber-500 hover:bg-amber-400
+           text-stage-950 font-semibold text-sm
+           rounded-lg transition-all duration-200
+           active:scale-[0.97];
+    box-shadow: 0 0 24px rgba(240, 165, 0, 0.25);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 0 40px rgba(240, 165, 0, 0.38);
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           text-stage-100 hover:text-white
+           border border-stage-500 hover:border-stage-400
+           rounded-lg transition-all duration-200 text-sm font-medium
+           active:scale-[0.97];
+    background: transparent;
+  }
+  .btn-ghost:hover {
+    background: rgba(19, 27, 46, 0.5);
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           text-rose-400 border border-rose-500
+           rounded-lg transition-all duration-200 text-sm font-medium
+           active:scale-[0.97];
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.25);
+  }
+  .btn-danger:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.5);
+  }
+
+  /* ── Typography ──────────────────────── */
+  .label {
+    @apply text-[11px] font-semibold tracking-[0.12em] uppercase text-stage-300;
+  }
+
+  /* ── Script sentence states ──────────── */
+  .sentence-line {
+    @apply px-3 py-2.5 rounded-lg cursor-default transition-all duration-300 text-sm leading-relaxed;
+  }
+  .sentence-line.active {
+    @apply font-medium text-white;
+    background: rgba(240, 165, 0, 0.05);
+    border-left: 3px solid rgba(240, 165, 0, 0.75);
+    padding-left: 0.75rem;
+    box-shadow: 0 0 16px rgba(240, 165, 0, 0.06);
+  }
+  .sentence-line.done {
+    @apply text-stage-400;
+  }
+  .sentence-line.needs-review {
+    color: rgba(240, 165, 0, 0.55);
+  }
+  .sentence-line.upcoming {
+    @apply text-stage-300;
+  }
+
+  /* ── Teleprompter lines ──────────────── */
+  .tele-line {
+    @apply leading-relaxed;
+    transition: all 0.35s ease;
+  }
+  .tele-active {
+    @apply text-white font-medium;
+    font-size: 0.9375rem;
+    opacity: 1;
+    padding-left: 14px;
+    border-left: 3px solid rgba(240, 165, 0, 0.8);
+  }
+  .tele-near {
+    @apply text-stage-200;
+    font-size: 0.8125rem;
+    opacity: 0.55;
+    padding-left: 4px;
+  }
+  .tele-far {
+    @apply text-stage-300;
+    font-size: 0.75rem;
+    opacity: 0.28;
+    padding-left: 4px;
+  }
+  .tele-done {
+    @apply text-stage-400;
+    font-size: 0.75rem;
+    opacity: 0.22;
+    text-decoration: line-through;
+    text-decoration-color: rgba(74, 92, 120, 0.5);
+    padding-left: 4px;
+  }
+  .tele-flagged {
+    font-size: 0.75rem;
+    opacity: 0.35;
+    padding-left: 4px;
+    color: rgba(240, 165, 0, 0.6);
+  }
+
+  /* ── Recording button states ─────────── */
+  .record-btn-idle {
+    @apply bg-stage-700 border-2 border-stage-500 text-stage-100
+           hover:bg-stage-600 hover:border-stage-400;
+  }
+  .record-btn-recording {
+    @apply bg-red-600 border-2 border-red-500 text-white;
+    animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .record-btn-processing {
+    @apply bg-indigo-600 border-2 border-indigo-500 text-indigo-300 cursor-wait;
+    background: rgba(79, 70, 229, 0.4);
+    border-color: rgba(99, 102, 241, 0.5);
+  }
+
+  /* ── Verdict banners ─────────────────── */
+  .verdict-pass {
+    @apply flex items-center gap-3 px-5 py-4 rounded-xl
+           text-emerald-400 font-semibold;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.28);
+    animation: pass-flash 0.6s ease-out both;
+  }
+  .verdict-fail {
+    @apply flex items-center justify-between px-5 py-4 rounded-xl
+           text-amber-400 font-semibold;
+    background: rgba(240, 165, 0, 0.06);
+    border: 1px solid rgba(240, 165, 0, 0.22);
+    animation: fade-in 0.3s ease-out both;
+  }
+  .verdict-auto {
+    @apply flex items-center gap-3 px-5 py-4 rounded-xl
+           text-stage-200 font-medium;
+    background: rgba(19, 27, 46, 0.6);
+    border: 1px solid rgba(36, 48, 78, 0.5);
+    animation: fade-in 0.3s ease-out both;
+  }
+
+  /* ── Score metric row ─────────────────── */
+  .metric-row {
+    @apply flex items-center gap-3 py-3;
+    border-bottom: 1px solid rgba(28, 38, 64, 0.5);
+    animation: score-enter 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+  .metric-row:last-child {
+    border-bottom: none;
+  }
+  .metric-num {
+    @apply font-mono font-semibold tabular-nums flex-shrink-0;
+    font-size: 1.375rem;
+    line-height: 1;
+    min-width: 2.5rem;
+    text-align: right;
+  }
+  .metric-bar-track {
+    @apply relative flex-1 rounded-full overflow-hidden;
+    height: 5px;
+    background: rgba(36, 48, 78, 0.8);
+  }
+  .metric-bar-fill {
+    @apply absolute inset-y-0 left-0 rounded-full;
+    transition: width 0.75s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ── Ambient recording overlay ────────── */
+  .recording-ambient {
+    transition: background 0.5s ease;
+    background: linear-gradient(to bottom,
+      rgba(239, 68, 68, 0.028) 0%,
+      transparent 35%
+    ) !important;
+    box-shadow: inset 0 0 100px rgba(239, 68, 68, 0.035);
+  }
+}
+
+/* ─── Page transition ───────────────────────────────────────────── */
+.page-enter { animation: fade-up 0.3s ease-out both; }
+
+/* ─── Keyframes (referenced by CSS component classes above) ─────── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes score-enter {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); }
+  50%       { box-shadow: 0 0 0 18px rgba(239, 68, 68, 0); }
+}
+@keyframes waveform {
+  0%   { transform: scaleY(0.25); opacity: 0.4; }
+  100% { transform: scaleY(1);    opacity: 1; }
+}
+@keyframes bounce-dot {
+  0%, 80%, 100% { transform: translateY(0); }
+  40%           { transform: translateY(-6px); }
+}
+@keyframes pass-flash {
+  0%   { opacity: 0; transform: scale(0.96); }
+  50%  { opacity: 1; transform: scale(1.01); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ─── Recharts dark overrides ───────────────────────────────────── */
+.recharts-cartesian-axis-tick text { fill: #4A5C78 !important; font-size: 10px; }
+.recharts-tooltip-wrapper { outline: none; }
+.recharts-default-tooltip {
+  background: #131B2E !important;
+  border: 1px solid #2D3C5C !important;
+  border-radius: 8px !important;
+  font-size: 12px;
+}
+.recharts-polar-angle-axis-tick text { fill: #687A96 !important; font-size: 11px; }

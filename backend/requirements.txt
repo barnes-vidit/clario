@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+librosa
+numpy
+scipy
+soundfile
+google-genai>=1.0.0
+groq
+python-docx
+pymupdf
+assemblyai
+edge-tts
+httpx
+websockets
+imageio-ffmpeg
