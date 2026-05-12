@@ -1,5 +1,7 @@
 # Clario
 
+![CI](https://github.com/barnes-vidit/clario/actions/workflows/ci.yml/badge.svg)
+
 Clario turns any script into a sentence-by-sentence speaking practice session. Upload your speech or presentation notes, and Clario coaches you through it — demonstrating ideal delivery, analysing your attempt acoustically, scoring you on pacing, filler words, pauses, and emphasis, and only advancing when you've genuinely improved.
 
 ## Prerequisites
