@@ -1,76 +1,68 @@
-# Clario
+# Clario — AI-Powered Public Speaking Coach
+
+> Practice sentence-by-sentence with demo narration, real-time acoustic analysis, and personalised coaching feedback.
 
 ![CI](https://github.com/barnes-vidit/clario/actions/workflows/ci.yml/badge.svg)
 
-Clario turns any script into a sentence-by-sentence speaking practice session. Upload your speech or presentation notes, and Clario coaches you through it — demonstrating ideal delivery, analysing your attempt acoustically, scoring you on pacing, filler words, pauses, and emphasis, and only advancing when you've genuinely improved.
+<!-- screenshot or demo GIF here -->
 
-## Prerequisites
+---
 
-- **Python 3.10+**
-- **Node.js 18+**
-- **ffmpeg** on your PATH — used for audio conversion (webm → WAV, MP3 → PCM)
-  - macOS: `brew install ffmpeg`
-  - Ubuntu: `sudo apt install ffmpeg`
-  - Windows: [ffmpeg.org/download](https://ffmpeg.org/download.html) → add to PATH
+## Quick Start
 
-## API Keys (all free tier)
+**Prerequisites:** Docker + Docker Compose, plus API keys for Groq, AssemblyAI, and Google AI Studio.
 
-| Service | Purpose | Sign up |
-|---------|---------|---------|
-| [AssemblyAI](https://www.assemblyai.com) | Speech-to-text | $50 non-expiring credit, no card |
-| [Groq](https://console.groq.com) | Script annotation + coaching feedback | Free tier |
-| [Google AI Studio](https://aistudio.google.com) | Demo narration (Gemini Live) | Free API key |
+1. Clone the repo and copy the env template:
+   ```bash
+   cp backend/.env.example backend/.env
+   # Fill in GROQ_API_KEY, ASSEMBLYAI_API_KEY, GEMINI_API_KEY
+   ```
+2. Start both services:
+   ```bash
+   docker compose up --build
+   ```
+3. Open [http://localhost](http://localhost) — backend runs on port 8000.
 
-## Setup
+**Manual setup (without Docker):** See [CLAUDE.md](CLAUDE.md#running-the-project).
 
-### 1. Backend
-
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env          # then fill in your API keys
-uvicorn main:app --reload --port 8000
-```
-
-**`backend/.env`**
-```
-ASSEMBLYAI_API_KEY=your_key
-GROQ_API_KEY=your_key
-GROQ_MODEL=llama-3.3-70b-versatile
-ASSEMBLYAI_MODEL=universal-2
-GEMINI_API_KEY=your_key
-GEMINI_LIVE_MODEL=gemini-3.1-flash-live-preview
-TTS_IDLE_TIMEOUT_S=90
-```
-
-### 2. Frontend
-
-```bash
-cd frontend
-npm install
-cp .env.example .env          # default values work for local dev
-npm run dev                   # http://localhost:5173
-```
-
-**`frontend/.env`**
-```
-VITE_BACKEND_URL=http://localhost:8000
-VITE_BACKEND_WS_URL=ws://localhost:8000
-```
+---
 
 ## How It Works
 
-1. **Upload** a `.txt`, `.docx`, or `.pdf` script and select your skill level (beginner / intermediate / advanced)
-2. **Review** the AI-generated annotations — hero words, target WPM, pause markers — and edit if needed
-3. **Practice** sentence by sentence:
-   - Listen to the demo narration (Gemini Live with SSML emphasis)
-   - Record yourself
-   - Get acoustic analysis (pitch, intensity, pauses via librosa) and a score
-   - Hear coaching feedback read aloud by the coach voice (edge-tts)
-   - Advance when all dimensions pass, or after 3 attempts
-4. **Paragraph review** after each paragraph, then a full **session report** with radar charts
+```mermaid
+flowchart LR
+    A[Upload Script] -->|POST /api/upload| B[Groq annotates sentences\nhero words · target WPM · pauses]
+    B --> C[Review & edit annotations]
+    C --> D[Practice loop]
+    D -->|GET /api/tts/demo| E[Gemini 3.1 Flash Live\nDemo narration PCM stream]
+    D -->|Record audio| F[Browser MediaRecorder\naudio/webm blob]
+    F -->|POST /api/analyse| G[AssemblyAI STT\n+ librosa pitch/intensity]
+    G -->|POST /api/feedback| H[Groq coaching text\n+ 4-dimension score]
+    H --> I{Pass all thresholds?}
+    I -->|Yes| J[Advance to next sentence]
+    I -->|No - retry| D
+    I -->|3rd fail| K[Auto-advance + needs_review flag]
+    J --> L{Paragraph complete?}
+    L -->|Yes| M[Paragraph review]
+    L -->|No| D
+```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | FastAPI · Python 3.12 |
+| LLM (annotation + coaching) | Groq `llama-3.3-70b-versatile` |
+| Speech-to-text | AssemblyAI `universal-2` |
+| Demo TTS | Gemini 3.1 Flash Live |
+| Coach TTS | edge-tts (Microsoft NeerjaExpressiveNeural) |
+| Acoustic analysis | librosa (pyin pitch, RMS intensity) |
+| Frontend | React 18 · Vite · Tailwind CSS |
+| Audio pipeline | ffmpeg · Web Audio API |
+
+---
 
 ## Scoring
 
@@ -85,18 +77,61 @@ All four dimensions must meet the skill-level threshold to advance:
 
 After 3 failed attempts the sentence is auto-advanced and flagged for review in the final report.
 
+---
+
+## Why I Built It This Way
+
+- **In-memory sessions** — avoids database setup complexity for a single-user demo; sessions are cheap (one per practice run) and persistence across restarts isn't needed for the use case.
+- **Dual TTS systems** — Gemini 3.1 Flash Live for demo narration because it supports SSML prosody control (emphasis, pauses) for expressive reading; edge-tts for coach feedback because it's free, low-latency, and runs over WebSocket for gapless streaming.
+- **Groq for both annotation and coaching** — `llama-3.3-70b-versatile` at Groq's inference speed fits the interactive loop; annotation is one call per upload, coaching is one call per attempt.
+- **librosa + AssemblyAI, not an end-to-end model** — separating STT (word timestamps) from acoustic feature extraction (pitch, intensity) gives explainable per-word scores rather than a black-box rating.
+
+---
+
+## Known Limitations
+
+- **No persistence** — sessions are in-memory; a backend restart wipes all sessions.
+- **No authentication** — any user who knows a session UUID can read it.
+- **No multi-user isolation** — designed for single-user demo use; rate limits are shared.
+- **ffmpeg required** — the backend depends on a system `ffmpeg` binary for audio format conversion.
+- **Groq rate limit** — annotation + coaching share 25 calls/min; heavy concurrent use will hit rate limits.
+
+---
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GROQ_API_KEY` | Yes | Groq API key |
+| `ASSEMBLYAI_API_KEY` | Yes | AssemblyAI API key |
+| `GEMINI_API_KEY` | Yes | Google AI Studio key |
+| `ALLOWED_ORIGINS` | No | Comma-separated CORS origins (default: `http://localhost:5173,http://localhost:5174`) |
+| `SENTRY_DSN` | No | Sentry DSN for error tracking |
+| `TTS_IDLE_TIMEOUT_S` | No | Gemini TTS idle timeout in seconds (default: `90`) |
+
+### Frontend (`frontend/.env`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `VITE_BACKEND_URL` | Yes | Backend HTTP base URL (e.g. `http://localhost:8000`) |
+| `VITE_BACKEND_WS_URL` | Yes | Backend WebSocket base URL (e.g. `ws://localhost:8000`) |
+
+---
+
 ## Project Structure
 
 ```
 clario/
 ├── backend/
 │   ├── main.py              # FastAPI app, CORS, rate limiting
-│   ├── session_store.py     # In-memory session state
+│   ├── session_store.py     # In-memory session state (Python dict, keyed by UUID)
 │   ├── requirements.txt
 │   └── routers/
 │       ├── upload.py        # File parsing + Groq annotation
 │       ├── session.py       # Session state CRUD
-│       ├── analyse.py       # AssemblyAI STT + librosa analysis
+│       ├── analyse.py       # AssemblyAI STT + librosa acoustic analysis
 │       ├── feedback.py      # Scoring + Groq coaching text
 │       ├── tts.py           # Gemini Live demo narration
 │       └── live_coach.py    # WebSocket coach voice (edge-tts)
@@ -104,9 +139,9 @@ clario/
     └── src/
         ├── App.jsx
         └── components/
-            ├── Onboarding.jsx
-            ├── AnnotationReview.jsx
-            ├── SessionView.jsx      # Main practice orchestrator
+            ├── Onboarding.jsx          # File upload + skill level
+            ├── AnnotationReview.jsx    # Edit AI-generated annotations
+            ├── SessionView.jsx         # Main practice orchestrator
             ├── ScriptPanel.jsx
             ├── RecordButton.jsx
             ├── ScoreCard.jsx
@@ -115,7 +150,7 @@ clario/
             └── SessionReport.jsx
 ```
 
-> **Note:** Sessions are in-memory only — no database. All session data is lost when the backend restarts.
+---
 
 ## Deployment
 
