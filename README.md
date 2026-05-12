@@ -1,4 +1,4 @@
-# Clario — AI-Powered Public Speaking Coach
+# Clario — Last Minute Presentation Practice Tool
 
 > Practice sentence-by-sentence with demo narration, real-time acoustic analysis, and personalised coaching feedback.
 

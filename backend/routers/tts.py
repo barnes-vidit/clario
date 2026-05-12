@@ -65,21 +65,11 @@ def _ssml_to_gemini_text(ssml: str) -> str:
     text = re.sub(r"</?speak>", "", ssml).strip()
     text = re.sub(r"<emphasis[^>]*>", "<emphasis>", text)
 
-    def _break_to_dots(m: re.Match) -> str:
-        try:
-            ms = int(m.group(1))
-        except ValueError:
-            return "...."
-        if ms < 400:
-            return "."
-        if ms < 700:
-            return ".."
-        if ms < 1100:
-            return "..."
-        return "...."
+    def _break_to_pause(_: re.Match) -> str:
+        return "<pause>"
 
-    text = re.sub(r"<break\s+time=['\"](\d+)ms['\"]/>", _break_to_dots, text)
-    text = re.sub(r"<(?!/?emphasis)[^>]+>", " ", text)
+    text = re.sub(r"<break\s+time=['\"](\d+)ms['\"]/>", _break_to_pause, text)
+    text = re.sub(r"<(?!/?emphasis|pause)[^>]+>", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 

@@ -50,7 +50,7 @@ Upload script → POST /api/upload
 Edit annotations → PATCH /api/session/{id}/annotation
 
 Practice loop (per sentence):
-  GET  /api/tts/demo         → Gemini 3.1 Flash Live streams PCM audio (demo narration)
+  POST /api/tts/demo         → Gemini 3.1 Flash Live streams PCM audio (demo narration)
   POST /api/analyse          → AssemblyAI STT + librosa acoustic analysis
   POST /api/feedback         → Groq generates coaching text + scoring
   WS   /ws/coach/{session_id} → edge-tts streams coach voice as PCM chunks
@@ -106,7 +106,7 @@ Sessions are **in-memory only** (Python dict in `backend/session_store.py`, keye
 2. Backend: `ffmpeg` converts webm → WAV 16kHz mono
 3. AssemblyAI `universal-2` → transcript + per-word millisecond timestamps
 4. `librosa.pyin` → F0 pitch per word; `librosa` RMS → dB intensity per word
-5. Gaps > 200ms between word timestamps → detected pauses
+5. Gaps > 350ms between word timestamps → detected pauses
 
 ### Scoring Algorithm
 
