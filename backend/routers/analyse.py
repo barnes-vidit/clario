@@ -49,6 +49,10 @@ def _convert_to_wav(audio_bytes: bytes, source_suffix: str) -> tuple[str, str]:
         text=True,
     )
     if result.returncode != 0:
+        try:
+            os.unlink(tmp_in)
+        except OSError:
+            pass
         raise RuntimeError(f"ffmpeg conversion failed: {result.stderr[-500:]}")
     return tmp_in, tmp_wav
 
