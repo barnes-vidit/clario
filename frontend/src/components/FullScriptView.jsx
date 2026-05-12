@@ -66,7 +66,6 @@ export default function FullScriptView() {
   const [errorMsg, setErrorMsg] = useState(null)
 
   const stepTimerRef = useRef(null)
-  const pendingBlobRef = useRef(null)
 
   // Load session
   useEffect(() => {

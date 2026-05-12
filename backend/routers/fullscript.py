@@ -4,7 +4,7 @@ import os
 import assemblyai as aai
 import librosa
 import numpy as np
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from groq import AsyncGroq
 
 import session_store

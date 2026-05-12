@@ -207,7 +207,28 @@ async def get_feedback(body: FeedbackRequest):
     hero_word_texts = [words_list[i] for i in ann.get("hero_words", []) if i < len(words_list)]
 
     pause_detail = score_pauses(body.pauses, ann.get("pause_markers", []), words_list)
-    emphasis_detail = score_emphasis(body.word_pitch, body.word_intensity, ann.get("hero_words", []), hero_word_texts)
+
+    # Re-map hero word texts → indices in the actual transcript (content_words space).
+    # ann["hero_words"] indices are script-space; word_pitch/word_intensity are transcript-space.
+    # Dropping fillers/artifacts in analyse.py shifts every subsequent index, causing misalignment.
+    transcript_words = [w["text"].lower().strip(".,!?") for w in body.words]
+    found_indices: list[int] = []
+    found_texts: list[str] = []
+    missed_texts: list[str] = []
+    for hw in hero_word_texts:
+        hw_lower = hw.lower().strip(".,!?")
+        try:
+            found_indices.append(transcript_words.index(hw_lower))
+            found_texts.append(hw)
+        except ValueError:
+            missed_texts.append(hw)
+
+    emphasis_detail = score_emphasis(body.word_pitch, body.word_intensity, found_indices, found_texts)
+    # Words not transcribed at all count as misses in the full-denominator score.
+    if missed_texts:
+        emphasis_detail["misses"].extend(missed_texts)
+        total_hero = len(hero_word_texts)
+        emphasis_detail["score"] = int(len(emphasis_detail["hits"]) / total_hero * 100) if total_hero else 100
 
     scores = {
         "pacing": score_pacing(body.wpm, ann.get("target_wpm", 130)),
