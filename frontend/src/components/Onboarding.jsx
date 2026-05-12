@@ -58,6 +58,12 @@ const WAVE_HEIGHTS = [
 const ACCEPTED = ['.txt', '.docx', '.pdf']
 const MAX_SIZE_MB = 5
 
+const STEP_LABELS = {
+  uploading: 'Uploading script…',
+  parsing: 'Parsing script…',
+  annotating: 'Annotating with AI…',
+}
+
 function FileDropzone({ file, onFile, onClear, dragActive, onDragEnter, onDragLeave, onDrop }) {
   const inputRef = useRef(null)
 
@@ -134,7 +140,7 @@ export default function Onboarding() {
   const [file, setFile] = useState(null)
   const [skillLevel, setSkillLevel] = useState('intermediate')
   const [dragActive, setDragActive] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loadingStep, setLoadingStep] = useState(null)
   const [error, setError] = useState(null)
 
   const handleFile = useCallback((f) => {
@@ -161,14 +167,23 @@ export default function Onboarding() {
   const handleSubmit = async () => {
     if (!file) { setError('Please upload your script first.'); return }
     setError(null)
-    setLoading(true)
+    setLoadingStep('uploading')
 
     try {
       const form = new FormData()
       form.append('file', file)
       form.append('skill_level', skillLevel)
 
-      const { data } = await axios.post(`${API}/api/upload`, form, { timeout: 300_000 })
+      const { data } = await axios.post(`${API}/api/upload`, form, {
+        timeout: 300_000,
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.loaded >= progressEvent.total) {
+            setLoadingStep('annotating')
+          } else {
+            setLoadingStep('parsing')
+          }
+        },
+      })
       navigate(`/review/${data.session_id}`, {
         state: { annotation: data.annotation, paragraphs: data.paragraphs, skill_level: data.skill_level },
       })
@@ -178,7 +193,7 @@ export default function Onboarding() {
         : err.response?.data?.detail || 'Something went wrong. Please try again.'
       setError(detail)
     } finally {
-      setLoading(false)
+      setLoadingStep(null)
     }
   }
 
@@ -344,30 +359,38 @@ export default function Onboarding() {
           )}
 
           {/* Submit */}
-          <button
-            onClick={handleSubmit}
-            disabled={loading || !file}
-            className={`
-              w-full flex items-center justify-center gap-2.5 py-3.5 rounded-lg
-              font-semibold text-sm transition-all duration-200
-              ${loading || !file
-                ? 'bg-amber-500/20 text-amber-300/50 cursor-not-allowed border border-amber-500/15'
-                : 'btn-primary'
-              }
-            `}
-          >
-            {loading ? (
-              <>
-                <Loader2 size={15} className="animate-spin" />
-                Preparing your script — this takes 30–60 s…
-              </>
-            ) : (
-              <>
-                Prepare My Script
-                <ChevronRight size={15} />
-              </>
+          <div className="space-y-2">
+            <button
+              onClick={handleSubmit}
+              disabled={loadingStep !== null || !file}
+              className={`
+                w-full flex items-center justify-center gap-2.5 py-3.5 rounded-lg
+                font-semibold text-sm transition-all duration-200
+                ${loadingStep !== null || !file
+                  ? 'bg-amber-500/20 text-amber-300/50 cursor-not-allowed border border-amber-500/15'
+                  : 'btn-primary'
+                }
+              `}
+            >
+              {loadingStep !== null ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  Preparing your script…
+                </>
+              ) : (
+                <>
+                  Prepare My Script
+                  <ChevronRight size={15} />
+                </>
+              )}
+            </button>
+            {loadingStep && (
+              <div className="flex items-center gap-2 text-sm text-stage-300">
+                <Loader2 size={14} className="animate-spin text-amber-400" />
+                {STEP_LABELS[loadingStep]}
+              </div>
             )}
-          </button>
+          </div>
 
           {/* Mobile privacy note */}
           <p className="lg:hidden text-xs text-stage-400 text-center">

@@ -7,6 +7,7 @@ import RecordButton from './RecordButton'
 import ScoreCard from './ScoreCard'
 import WaveformVisualiser from './WaveformVisualiser'
 import ParagraphReport from './ParagraphReport'
+import ErrorCard from './ErrorCard'
 
 function renderSentenceWithHighlights(sentence) {
   if (!sentence.hero_words?.length) return sentence.text
@@ -28,6 +29,18 @@ function renderSentenceWithHighlights(sentence) {
 const API = import.meta.env.VITE_BACKEND_URL
 const WS_URL = import.meta.env.VITE_BACKEND_WS_URL
 
+function toErrorMessage(err) {
+  if (err?.response?.status === 429) return 'Rate limited — please wait a moment and try again.'
+  if (err?.code === 'ECONNABORTED') return 'Request timed out — the server may be busy.'
+  return err?.response?.data?.detail || null
+}
+
+const ANALYSIS_LABELS = {
+  uploading: 'Uploading audio…',
+  transcribing: 'Transcribing speech…',
+  analysing: 'Analysing delivery…',
+}
+
 export default function SessionView() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
@@ -41,6 +54,9 @@ export default function SessionView() {
   const [retryCount, setRetryCount] = useState(0)
   const [phase, setPhase] = useState('demo')
   const [needsReview, setNeedsReview] = useState([])
+
+  const [sessionError, setSessionError] = useState(null)
+  const [isOffline, setIsOffline] = useState(!navigator.onLine)
 
   const [demoLoading, setDemoLoading] = useState(false)
   const [demoUrl, setDemoUrl] = useState(null)
@@ -58,6 +74,7 @@ export default function SessionView() {
   const recordButtonRef = useRef(null)
 
   const [displayStep, setDisplayStep] = useState(0)
+  const [analysisStep, setAnalysisStep] = useState(null)
   const carouselIntervalRef = useRef(null)
 
   const coachWsRef = useRef(null)
@@ -66,6 +83,18 @@ export default function SessionView() {
   const [coachSpeaking, setCoachSpeaking] = useState(false)
 
   const skipNextDemoLoad = useRef(false)
+
+  // ─── Offline detection ───────────────────────────────────────────
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false)
+    const handleOffline = () => setIsOffline(true)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   // ─── Load session ───────────────────────────────────────────────
   useEffect(() => {
@@ -150,7 +179,8 @@ export default function SessionView() {
       const url = URL.createObjectURL(resp.data)
       prevDemoUrlRef.current = url
       setDemoUrl(url)
-    } catch {
+    } catch (err) {
+      setSessionError('Demo audio unavailable — you can still record.')
       setPhase('record')
     } finally {
       setDemoLoading(false)
@@ -187,6 +217,7 @@ export default function SessionView() {
   // ─── Recording complete ──────────────────────────────────────────
   const handleRecordingComplete = useCallback(async (blob, mimeType) => {
     setIsActivelyRecording(false)
+    setSessionError(null)
     setPhase('analysing')
     setDisplayStep(0)
 
@@ -206,9 +237,15 @@ export default function SessionView() {
       form.append('sentence_id', String(currentSentenceId))
       form.append('type', 'sentence')
 
-      const { data: analysis } = await axios.post(`${API}/api/analyse`, form)
+      setAnalysisStep('uploading')
+      const { data: analysis } = await axios.post(`${API}/api/analyse`, form, {
+        onUploadProgress: (e) => {
+          if (e.loaded >= e.total) setAnalysisStep('transcribing')
+        },
+      })
       setAnalysisResult(analysis)
 
+      setAnalysisStep('analysing')
       const { data: feedback } = await axios.post(`${API}/api/feedback`, {
         session_id: sessionId,
         sentence_id: currentSentenceId,
@@ -217,6 +254,7 @@ export default function SessionView() {
       })
 
       clearInterval(carouselIntervalRef.current)
+      setAnalysisStep(null)
       setFeedbackResult(feedback)
       setPhase('feedback')
 
@@ -225,8 +263,10 @@ export default function SessionView() {
       if (feedback.auto_advanced) {
         setNeedsReview(prev => [...new Set([...prev, currentSentenceId])])
       }
-    } catch {
+    } catch (err) {
       clearInterval(carouselIntervalRef.current)
+      setAnalysisStep(null)
+      setSessionError(toErrorMessage(err) ?? 'Could not analyse your recording. Please try again.')
       setPhase('record')
     }
   }, [sentences, currentSentenceId, sessionId, retryCount, speakCoachFeedback])
@@ -249,7 +289,9 @@ export default function SessionView() {
         setCurrentSentenceId(data.next_sentence_id)
         setRetryCount(0)
       }
-    } catch { /* ignore */ }
+    } catch (err) {
+      setSessionError(toErrorMessage(err) ?? 'Could not advance to the next sentence. Please try again.')
+    }
   }, [sessionId, navigate])
 
   const handleRetry = useCallback(() => {
@@ -309,6 +351,12 @@ export default function SessionView() {
 
   return (
     <div className="min-h-screen flex flex-col">
+
+      {isOffline && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500/90 text-stage-900 text-sm text-center py-2 font-medium">
+          You are offline — check your internet connection
+        </div>
+      )}
 
       {/* Progress bar — top of screen */}
       <div className="h-[3px] bg-stage-700 fixed top-0 left-0 right-0 z-50">
@@ -539,6 +587,14 @@ export default function SessionView() {
                     ))}
                   </div>
 
+                  {/* Analysis step label */}
+                  {analysisStep && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-stage-300 mt-2">
+                      <Loader2 size={14} className="animate-spin text-amber-400" />
+                      {ANALYSIS_LABELS[analysisStep]}
+                    </div>
+                  )}
+
                 </div>
               </div>
             )
@@ -638,6 +694,14 @@ export default function SessionView() {
                 </div>
 
               </div>
+            </div>
+          )}
+          {sessionError && (
+            <div className="px-4 pb-4">
+              <ErrorCard
+                message={sessionError}
+                onRetry={() => setSessionError(null)}
+              />
             </div>
           )}
         </div>
