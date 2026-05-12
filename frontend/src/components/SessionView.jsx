@@ -587,13 +587,6 @@ export default function SessionView() {
                     ))}
                   </div>
 
-                  {/* Analysis step label */}
-                  {analysisStep && (
-                    <div className="flex items-center justify-center gap-2 text-sm text-stage-300 mt-2">
-                      <Loader2 size={14} className="animate-spin text-amber-400" />
-                      {ANALYSIS_LABELS[analysisStep]}
-                    </div>
-                  )}
 
                 </div>
               </div>

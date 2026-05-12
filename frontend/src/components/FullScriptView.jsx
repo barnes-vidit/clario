@@ -9,6 +9,23 @@ import RecordButton from './RecordButton'
 
 const API = import.meta.env.VITE_BACKEND_URL
 
+function renderSentenceWithHighlights(sentence) {
+  if (!sentence.hero_words?.length) return sentence.text
+  const words = sentence.text.split(' ')
+  const heroSet = new Set(sentence.hero_words)
+  const pauseMap = {}
+  for (const pm of (sentence.pause_markers || [])) {
+    pauseMap[pm.after_word_index] = true
+  }
+  return words.map((word, i) => (
+    <span key={i}>
+      <span className={heroSet.has(i) ? 'text-amber-400 font-semibold' : undefined}>{word}</span>
+      {pauseMap[i] && <span className="text-amber-500/40 mx-0.5 text-sm">·|·</span>}
+      {i < words.length - 1 && ' '}
+    </span>
+  ))
+}
+
 const MAX_RECORD_MS = 5 * 60 * 1000 // 5 minutes
 
 const DIMS = [
@@ -355,7 +372,7 @@ export default function FullScriptView() {
             {sentences.map((s, i) => (
               <p key={s.sentence_id} className="text-stage-200 text-sm leading-relaxed">
                 <span className="text-stage-600 font-mono text-xs mr-2 select-none">{i + 1}.</span>
-                {s.text}
+                {renderSentenceWithHighlights(s)}
               </p>
             ))}
           </div>
