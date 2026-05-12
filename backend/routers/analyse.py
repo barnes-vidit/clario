@@ -8,6 +8,7 @@ import assemblyai as aai
 import librosa
 import numpy as np
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 import session_store
 from utils import find_ffmpeg
@@ -60,6 +61,11 @@ def _detect_suffix(content_type: str) -> str:
     return ".webm"
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10), reraise=True)
+def _transcribe(transcriber, audio_path, config):
+    return transcriber.transcribe(audio_path, config)
+
+
 async def _run_stt(wav_path: str, hero_word_texts: list[str]) -> object:
     aai.settings.api_key = ASSEMBLYAI_API_KEY
     aai.settings.http_timeout = 120  # default 30 s causes WriteTimeout on slow connections
@@ -74,7 +80,7 @@ async def _run_stt(wav_path: str, hero_word_texts: list[str]) -> object:
         config_kwargs["boost_param"] = aai.WordBoost.high
     config = aai.TranscriptionConfig(**config_kwargs)
     transcriber = aai.Transcriber()
-    return await asyncio.to_thread(transcriber.transcribe, wav_path, config)
+    return await asyncio.to_thread(_transcribe, transcriber, wav_path, config)
 
 
 def _acoustic_analysis(wav_path: str, words: list[dict]) -> dict:

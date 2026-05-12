@@ -7,6 +7,7 @@ from groq import AsyncGroq
 from pydantic import BaseModel
 
 import session_store
+from utils import call_groq_with_retry
 
 log = logging.getLogger("clario.feedback")
 router = APIRouter()
@@ -169,7 +170,8 @@ If STATUS IS PASSED: react like a friend who just heard them nail it — pick on
 If STATUS IS NOT PASSED: give one direct tip on the weakest area using the specific word or pause above — like you're telling a friend what to fix, not writing a report.
 2–3 short sentences. Casual. No formal language."""
 
-    response = await _get_groq_client().chat.completions.create(
+    response = await call_groq_with_retry(
+        _get_groq_client(),
         model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
         messages=[
             {
