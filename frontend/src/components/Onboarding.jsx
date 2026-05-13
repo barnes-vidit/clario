@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { Mic, Upload, FileText, BookOpen, Zap, ChevronRight, X, Loader2, Volume2, TrendingUp } from 'lucide-react'
+import { Mic, Upload, FileText, BookOpen, Zap, ChevronRight, X, Loader2, Volume2, TrendingUp, ClipboardPaste } from 'lucide-react'
 
 const API = import.meta.env.VITE_BACKEND_URL
 
@@ -147,6 +147,9 @@ export default function Onboarding() {
   const [loadingStep, setLoadingStep] = useState(null)
   const [error, setError] = useState(null)
 
+  const [inputMode, setInputMode] = useState('upload') // 'upload' | 'paste'
+  const [pasteText, setPasteText] = useState('')
+
   const handleFile = useCallback((f) => {
     if (!f) return
     const ext = f.name.split('.').pop().toLowerCase()
@@ -169,13 +172,22 @@ export default function Onboarding() {
   }, [handleFile])
 
   const handleSubmit = async () => {
-    if (!file) { setError('Please upload your script first.'); return }
+    let fileToUpload = file
+
+    if (inputMode === 'paste') {
+      if (!pasteText.trim()) { setError('Please paste your script first.'); return }
+      const blob = new Blob([pasteText], { type: 'text/plain' })
+      fileToUpload = new File([blob], 'script.txt', { type: 'text/plain' })
+    } else {
+      if (!file) { setError('Please upload your script first.'); return }
+    }
+
     setError(null)
     setLoadingStep('uploading')
 
     try {
       const form = new FormData()
-      form.append('file', file)
+      form.append('file', fileToUpload)
       form.append('skill_level', skillLevel)
 
       const { data } = await axios.post(`${API}/api/upload`, form, {
@@ -193,7 +205,7 @@ export default function Onboarding() {
       })
     } catch (err) {
       const detail = err.code === 'ECONNABORTED'
-        ? 'Timed out — your script may be too long. Try a shorter file.'
+        ? `Timed out — your script may be too long. Try a shorter ${inputMode === 'paste' ? 'passage' : 'file'}.`
         : err.response?.data?.detail || 'Something went wrong. Please try again.'
       setError(detail)
     } finally {
@@ -286,21 +298,80 @@ export default function Onboarding() {
           {/* Desktop form header */}
           <div className="hidden lg:block space-y-1">
             <p className="font-display text-white font-normal text-xl">Prepare your script</p>
-            <p className="text-stage-300 text-sm mt-0.5">Upload your presentation and we'll build your practice session.</p>
+            <p className="text-stage-300 text-sm mt-0.5">Add your script and we'll build your practice session.</p>
           </div>
 
-          {/* File upload */}
+          {/* Script input */}
           <div className="space-y-2">
             <p className="label">Your Script</p>
-            <FileDropzone
-              file={file}
-              onFile={handleFile}
-              onClear={() => setFile(null)}
-              dragActive={dragActive}
-              onDragEnter={handleDragEnter}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            />
+
+            {/* Tab toggle */}
+            <div className="flex rounded-lg bg-stage-800/60 border border-stage-600/40 p-0.5 gap-0.5">
+              {[
+                { id: 'upload', label: 'Upload File', Icon: Upload },
+                { id: 'paste',  label: 'Paste Text',  Icon: ClipboardPaste },
+              ].map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => { setInputMode(id); setError(null) }}
+                  className={`
+                    flex-1 flex items-center justify-center gap-1.5
+                    py-2 rounded-md text-xs font-medium transition-all duration-200
+                    ${inputMode === id
+                      ? 'bg-stage-700 text-white shadow-sm'
+                      : 'text-stage-400 hover:text-stage-200'
+                    }
+                  `}
+                >
+                  <Icon size={12} />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* File dropzone */}
+            {inputMode === 'upload' && (
+              <FileDropzone
+                file={file}
+                onFile={handleFile}
+                onClear={() => setFile(null)}
+                dragActive={dragActive}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              />
+            )}
+
+            {/* Paste textarea */}
+            {inputMode === 'paste' && (
+              <div className="relative min-h-[160px]">
+                <textarea
+                  id="paste-script"
+                  value={pasteText}
+                  onChange={e => setPasteText(e.target.value)}
+                  placeholder="Paste your script here…"
+                  rows={5}
+                  className="w-full px-4 py-3 rounded-xl text-sm text-stage-100 leading-relaxed resize-none
+                             bg-stage-800/30 border border-stage-500/60
+                             placeholder:text-stage-500
+                             focus:outline-none focus:border-amber-500/50 focus:bg-stage-800/50
+                             transition-all duration-200"
+                />
+                {pasteText && (
+                  <button
+                    onClick={() => setPasteText('')}
+                    className="absolute top-2.5 right-2.5 w-5 h-5 rounded flex items-center justify-center
+                               bg-stage-600 hover:bg-stage-500 transition-colors"
+                    aria-label="Clear text"
+                  >
+                    <X size={10} className="text-stage-200" />
+                  </button>
+                )}
+                <p className="text-[10px] text-stage-500 mt-1.5 text-right">
+                  {pasteText.trim().split(/\s+/).filter(Boolean).length} words
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Skill level */}
@@ -367,11 +438,11 @@ export default function Onboarding() {
           <div className="space-y-2">
             <button
               onClick={handleSubmit}
-              disabled={loadingStep !== null || !file}
+              disabled={loadingStep !== null || (inputMode === 'upload' ? !file : !pasteText.trim())}
               className={`
                 w-full flex items-center justify-center gap-2.5 py-3.5 rounded-lg
                 font-semibold text-sm transition-all duration-200
-                ${loadingStep !== null || !file
+                ${loadingStep !== null || (inputMode === 'upload' ? !file : !pasteText.trim())
                   ? 'bg-stage-700/60 text-stage-400 cursor-not-allowed border border-stage-600/40'
                   : 'btn-primary'
                 }

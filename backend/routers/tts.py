@@ -42,7 +42,8 @@ _LIVE_CONFIG = types.LiveConnectConfig(
     system_instruction=types.Content(
         parts=[types.Part(
             text=(
-                "Read the sentence aloud, using bracketed tags for emphasis or long dramatic pauses."
+                "Read the sentence aloud, using bracketed tags for [emphasis] or [long dramatic pause]."
+                "Do not speak anything else."
             )
         )]
     ),

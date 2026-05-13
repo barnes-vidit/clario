@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { Play, RotateCcw, ChevronRight, Volume2, VolumeX, Loader2, Mic, FileText, Activity, MessageSquare } from 'lucide-react'
@@ -8,6 +8,7 @@ import ScoreCard from './ScoreCard'
 import WaveformVisualiser from './WaveformVisualiser'
 import ParagraphReport from './ParagraphReport'
 import ErrorCard from './ErrorCard'
+import RecordingTip from './RecordingTip'
 
 function renderSentenceWithHighlights(sentence) {
   if (!sentence.hero_words?.length) return sentence.text
@@ -28,6 +29,29 @@ function renderSentenceWithHighlights(sentence) {
 
 const API = import.meta.env.VITE_BACKEND_URL
 const WS_URL = import.meta.env.VITE_BACKEND_WS_URL
+
+const RECORDING_TIPS = [
+  {
+    id: 'pitch',
+    text: 'To emphasise a word, try using a slightly higher pitch for that word compared to the rest of the sentence.',
+  },
+  {
+    id: 'eyes',
+    text: "Try closing your eyes while recording. You'll focus more on delivery — and memorise the script faster too.",
+  },
+  {
+    id: 'silence',
+    text: 'Instead of filling pauses with "um" or "aah", try staying silent. Silence gives your brain clarity.',
+  },
+  {
+    id: 'breath',
+    text: 'Take a slow breath before you start. It resets your voice and keeps your pace from rushing.',
+  },
+  {
+    id: 'posture',
+    text: 'Sit or stand tall while recording. Good posture opens your airways and naturally improves your vocal tone.',
+  },
+]
 
 function toErrorMessage(err) {
   if (err?.response?.status === 429) return 'Rate limited — please wait a moment and try again.'
@@ -76,6 +100,10 @@ export default function SessionView() {
   const [displayStep, setDisplayStep] = useState(0)
   const [analysisStep, setAnalysisStep] = useState(null)
   const carouselIntervalRef = useRef(null)
+
+  const [tipDismissed, setTipDismissed] = useState(false)
+  const [tipIndex, setTipIndex] = useState(0)
+  const tipIntervalRef = useRef(null)
 
   const coachWsRef = useRef(null)
   const audioCtxRef = useRef(null)
@@ -306,6 +334,25 @@ export default function SessionView() {
     loadDemo(currentSentenceId)
   }, [currentSentenceId, loadDemo])
 
+  // ─── Tip popup ───────────────────────────────────────────────────
+  // Reset tip each time the user moves to a new sentence
+  useEffect(() => {
+    setTipDismissed(false)
+    setTipIndex(Math.floor(Math.random() * RECORDING_TIPS.length))
+  }, [currentSentenceId])
+
+  // Auto-cycle tips every 8 s while in record phase and not dismissed
+  useEffect(() => {
+    if (phase !== 'record' || tipDismissed) {
+      clearInterval(tipIntervalRef.current)
+      return
+    }
+    tipIntervalRef.current = setInterval(() => {
+      setTipIndex(i => (i + 1) % RECORDING_TIPS.length)
+    }, 8000)
+    return () => clearInterval(tipIntervalRef.current)
+  }, [phase, tipDismissed])
+
   // Space bar to start/stop recording
   useEffect(() => {
     if (phase !== 'record') return
@@ -491,7 +538,7 @@ export default function SessionView() {
 
           {/* ── Phase: RECORD ────────────────────────────────────── */}
           {phase === 'record' && (
-            <div className="flex-1 flex flex-col px-8 py-8 animate-fade-up">
+            <div className="flex-1 flex flex-col px-8 py-8 animate-fade-up relative">
               <div className="max-w-3xl w-full mx-auto flex-1 flex flex-col">
                 {/* Sentence at top — dims while actively recording */}
                 <div
@@ -526,6 +573,18 @@ export default function SessionView() {
                   </p>
                 </div>
               </div>
+
+              {/* Tip popup — floats bottom-right, hidden while actively recording */}
+              {!tipDismissed && !isActivelyRecording && (
+                <RecordingTip
+                  tip={RECORDING_TIPS[tipIndex]}
+                  tipIndex={tipIndex}
+                  totalTips={RECORDING_TIPS.length}
+                  onDismiss={() => setTipDismissed(true)}
+                  onPrev={() => setTipIndex(i => (i - 1 + RECORDING_TIPS.length) % RECORDING_TIPS.length)}
+                  onNext={() => setTipIndex(i => (i + 1) % RECORDING_TIPS.length)}
+                />
+              )}
             </div>
           )}
 
