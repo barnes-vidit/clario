@@ -182,6 +182,12 @@ async def analyse_audio(
         if transcript.status == aai.TranscriptStatus.error:
             raise HTTPException(status_code=502, detail=f"STT error: {transcript.error}")
 
+        if not (transcript.text or "").strip():
+            raise HTTPException(
+                status_code=422,
+                detail="No speech detected — make sure your microphone is working and try again.",
+            )
+
         all_words = [
             {"text": w.text, "start": w.start, "end": w.end}
             for w in (transcript.words or [])
@@ -208,6 +214,19 @@ async def analyse_audio(
 
         filler_words_found = [w["text"] for w in all_words if _is_filler(w["text"])]
         content_words = [w for w in all_words if not _is_filler(w["text"]) and not _is_artifact(w["text"])]
+
+        if type == "sentence" and sentence_id is not None and ann_for_filter:
+            expected = {
+                w.lower().strip(".,!?'\"")
+                for w in ann_for_filter["text"].split()
+                if len(w) > 2
+            }
+            spoken = {w["text"].lower().strip(".,!?'\"") for w in content_words}
+            if expected and len(expected & spoken) / len(expected) < 0.4:
+                raise HTTPException(
+                    status_code=422,
+                    detail="That didn't match the sentence — please read the highlighted text and try again.",
+                )
 
         acoustic = _acoustic_analysis(y, sr, content_words)
 

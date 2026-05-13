@@ -27,7 +27,7 @@ def _get_genai_client() -> genai.Client:
 
 
 GEMINI_LIVE_MODEL = os.getenv("GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview")
-DEMO_VOICE = "Aoede"  # lyrical, expressive — best for public speaking demo
+DEMO_VOICE = "Zephyr"  # lyrical, expressive — best for public speaking demo
 _IDLE_TIMEOUT_S = float(os.getenv("TTS_IDLE_TIMEOUT_S", "90"))
 
 _LIVE_CONFIG = types.LiveConnectConfig(
@@ -42,13 +42,7 @@ _LIVE_CONFIG = types.LiveConnectConfig(
     system_instruction=types.Content(
         parts=[types.Part(
             text=(
-                "You are a professional public speaker. You give presentations/speeches for a living and are very good at it. "
-                "Read aloud the content words of the text you receive, using the markup as prosody instructions:\n"
-                "- <emphasis>word</emphasis>: speak that word with noticeably higher pitch and volume — do NOT say the tag names.\n"
-                "- <pause>: take extended noticeable pause to create impact — do NOT say pause\n"
-                "Apart from these two tags , you can use the natural, deliberate prosody of a skilled public speaker throughout. "
-                "Do NOT add any words, greetings, commentary, or continuations before or after the text. "
-                "Stop the instant the provided text ends."
+                "Read the sentence aloud, using bracketed tags for emphasis or long dramatic pauses."
             )
         )]
     ),
@@ -63,13 +57,15 @@ class TtsRequest(BaseModel):
 def _ssml_to_gemini_text(ssml: str) -> str:
     """Convert SSML markup to Gemini Live-compatible inline markup."""
     text = re.sub(r"</?speak>", "", ssml).strip()
-    text = re.sub(r"<emphasis[^>]*>", "<emphasis>", text)
+    text = re.sub(r"<emphasis[^>]*>", "[emphasis]", text)
+    text = re.sub(r"</emphasis>", "[/emphasis] ", text)
+
 
     def _break_to_pause(_: re.Match) -> str:
-        return "<pause>"
+        return "[long dramatic pause]"
 
-    text = re.sub(r"<break\s+time=['\"](\d+)ms['\"]/>", _break_to_pause, text)
-    text = re.sub(r"<(?!/?emphasis|pause)[^>]+>", " ", text)
+    text = re.sub(r"<break\b[^>]*time=['\"]\d+ms['\"][^>]*/?>", _break_to_pause, text)
+    text = re.sub(r"<[^>]+>", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
