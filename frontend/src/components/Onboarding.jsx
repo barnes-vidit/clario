@@ -52,7 +52,11 @@ const SKILL_LEVELS = [
 
 const WAVE_HEIGHTS = [
   28, 52, 38, 75, 32, 88, 58, 70, 42, 84, 52, 65, 38, 94, 48, 78,
-  35, 82, 62, 68, 45, 76, 40, 60, 52, 80, 33, 72,
+  35, 82, 62, 68, 45, 76, 40, 60, 52, 80, 33, 72, 55, 88, 42, 66,
+  30, 78, 50, 90, 38, 72, 44, 85, 60, 70, 36, 80, 48, 92, 55, 68,
+  40, 82, 35, 74, 58, 88, 42, 65, 30, 78, 50, 95, 45, 70, 38, 84,
+  55, 66, 32, 80, 48, 90, 40, 72, 36, 86, 52, 68, 42, 76, 28, 88,
+  45, 62, 38, 80, 55, 70, 33, 84, 48, 65, 40, 90, 35, 74, 52, 78,
 ]
 
 const ACCEPTED = ['.txt', '.docx', '.pdf']
@@ -211,10 +215,11 @@ export default function Onboarding() {
           <div className="absolute bottom-0 right-0 w-[500px] h-[400px] bg-gradient-radial from-amber-500/5 to-transparent rounded-full translate-x-1/4 translate-y-1/4" />
         </div>
 
-        {/* Center block: logo + headline + value props */}
-        <div className="flex-1 flex flex-col justify-center relative z-10 space-y-10">
-          <p className="font-display italic text-white/70 text-xl tracking-tight">Clario</p>
+        {/* Logo — pinned to top */}
+        <p className="font-display italic text-white/70 text-xl tracking-tight relative z-10 flex-shrink-0">Clario</p>
 
+        {/* Center block: headline + value props */}
+        <div className="flex-1 flex flex-col justify-center relative z-10">
           <div className="space-y-8">
             <div className="space-y-4">
               <h1 className="font-display text-[3.25rem] font-normal text-white leading-[1.08] tracking-tight">
@@ -229,9 +234,9 @@ export default function Onboarding() {
             {/* Value props with icons */}
             <div className="space-y-3.5">
               {[
-                { Icon: Mic,        text: 'Sentence-by-sentence coaching, live' },
-                { Icon: Volume2,    text: 'Hear the ideal delivery before you attempt it' },
-                { Icon: TrendingUp, text: 'Pace, pauses, and emphasis — all measured' },
+                { Icon: Mic, text: 'Sentence-by-sentence coaching, live' },
+                { Icon: Volume2, text: 'Hear the ideal delivery before you attempt it' },
+                { Icon: TrendingUp, text: 'Pace, pauses, and emphasis - all measured' },
               ].map(({ Icon, text }, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center">
@@ -250,7 +255,7 @@ export default function Onboarding() {
             {WAVE_HEIGHTS.map((h, i) => (
               <div
                 key={i}
-                className="flex-1 bg-amber-400 rounded-full origin-bottom animate-waveform"
+                className="w-[3px] bg-amber-400 rounded-full origin-bottom animate-waveform flex-shrink-0"
                 style={{
                   height: `${h}%`,
                   opacity: 0.25 + (h / 100) * 0.45,
@@ -276,7 +281,7 @@ export default function Onboarding() {
           <p className="text-stage-300 text-sm">Last-minute prep. Done right.</p>
         </div>
 
-        <div className="w-full max-w-[420px] space-y-8 animate-fade-up" style={{ animationDelay: '0.05s' }}>
+        <div className="w-full max-w-[420px] space-y-6 animate-fade-up" style={{ animationDelay: '0.05s' }}>
 
           {/* Desktop form header */}
           <div className="hidden lg:block space-y-1">
@@ -367,7 +372,7 @@ export default function Onboarding() {
                 w-full flex items-center justify-center gap-2.5 py-3.5 rounded-lg
                 font-semibold text-sm transition-all duration-200
                 ${loadingStep !== null || !file
-                  ? 'bg-amber-500/20 text-amber-300/50 cursor-not-allowed border border-amber-500/15'
+                  ? 'bg-stage-700/60 text-stage-400 cursor-not-allowed border border-stage-600/40'
                   : 'btn-primary'
                 }
               `}
@@ -385,10 +390,7 @@ export default function Onboarding() {
               )}
             </button>
             {loadingStep && (
-              <div className="flex items-center gap-2 text-sm text-stage-300">
-                <Loader2 size={14} className="animate-spin text-amber-400" />
-                {STEP_LABELS[loadingStep]}
-              </div>
+              <p className="text-xs text-stage-400 text-center">{STEP_LABELS[loadingStep]}</p>
             )}
           </div>
 

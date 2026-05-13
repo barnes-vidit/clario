@@ -5,7 +5,7 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
 } from 'recharts'
-import { Download, RotateCcw, Home, CheckCircle2, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react'
+import { Download, RotateCcw, Home, CheckCircle2, AlertTriangle, TrendingUp, TrendingDown, Play } from 'lucide-react'
 
 const API = import.meta.env.VITE_BACKEND_URL
 
@@ -430,6 +430,23 @@ export default function SessionReport() {
             </button>
           </div>
         )}
+
+        {/* ── Full Script Practice CTA ───────────────────────── */}
+        <div className="card p-6 space-y-3">
+          <div className="space-y-1">
+            <p className="text-white font-medium text-sm">Ready to run it all the way through?</p>
+            <p className="text-stage-400 text-xs">
+              Practice your entire script in one continuous take — no demos, no retries.
+              Scored on pacing consistency, overall flow, and delivery arc.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate(`/session/${sessionId}/fullscript`)}
+            className="btn-primary w-full"
+          >
+            <Play size={13} /> Practice Full Script
+          </button>
+        </div>
 
         {/* ── Actions ────────────────────────────────────── */}
         <div className="flex gap-4 pb-12">

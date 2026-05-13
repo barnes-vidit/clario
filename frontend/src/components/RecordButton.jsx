@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHand
 import { Mic, Square, Loader2 } from 'lucide-react'
 
 const MIN_DURATION_MS = 1000
-const MAX_DURATION_MS = 60000
+const DEFAULT_MAX_DURATION_MS = 60000
 const CIRCUMFERENCE = 2 * Math.PI * 46 // radius 46 on a 100x100 viewBox
 
 function formatTime(ms) {
@@ -13,7 +13,7 @@ function formatTime(ms) {
 }
 
 // States: 'idle' | 'recording' | 'processing'
-const RecordButton = forwardRef(function RecordButton({ onRecordingComplete, onRecordingStart, disabled = false }, ref) {
+const RecordButton = forwardRef(function RecordButton({ onRecordingComplete, onRecordingStart, disabled = false, maxDurationMs = DEFAULT_MAX_DURATION_MS }, ref) {
   const [state, setState] = useState('idle')
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
@@ -84,8 +84,8 @@ const RecordButton = forwardRef(function RecordButton({ onRecordingComplete, onR
       setElapsed(Date.now() - startTimeRef.current)
     }, 200)
 
-    autoStopRef.current = setTimeout(() => stopRecording(), MAX_DURATION_MS)
-  }, [onRecordingComplete, stopRecording])
+    autoStopRef.current = setTimeout(() => stopRecording(), maxDurationMs)
+  }, [onRecordingComplete, stopRecording, maxDurationMs])
 
   useEffect(() => () => clearTimers(), [])
 
@@ -111,7 +111,7 @@ const RecordButton = forwardRef(function RecordButton({ onRecordingComplete, onR
   const isDisabled = disabled || isProcessing
 
   // SVG arc progress (depletes over MAX_DURATION_MS)
-  const progressRatio = isRecording ? elapsed / MAX_DURATION_MS : 0
+  const progressRatio = isRecording ? elapsed / maxDurationMs : 0
   const dashOffset = CIRCUMFERENCE * (1 - progressRatio)
 
   return (
