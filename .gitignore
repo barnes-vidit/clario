@@ -42,3 +42,6 @@ Thumbs.db
 
 # MCP temp files
 .playwright-mcp/
+
+#worktree
+.claude/
